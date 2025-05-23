@@ -1,322 +1,228 @@
-
-import java.awt.*;
-import java.util.*;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.util.ArrayList;
 
 public class Steganography {
 
-    
-    //clearlow
-    public static void clearLow(Pixel p) {
-        int red = (p.getRed() / 4) * 4;
-        int green = (p.getGreen() / 4) * 4;
-        int blue = (p.getBlue() / 4) * 4;
-        p.setColor(new Color(red, green, blue));
+    public static void wipeLowBits(Pixel px) {
+        int red = (px.getRed() / 4) * 4;
+        int green = (px.getGreen() / 4) * 4;
+        int blue = (px.getBlue() / 4) * 4;
+        px.setColor(new Color(red, green, blue));
     }
 
-
-
-
-
-
-
-
-
-    //main
-    public static PictureMain testClearLow(PictureMain p) {
-        PictureMain copyelement = new PictureMain(p);
-        Pixel[][] pixels = copyelement.getPixels2D();
-        for (Pixel[] row : pixels) {
-            for (Pixel pixel : row) {
-                clearLow(pixel);
+    public static Picture previewWipeLowBits(Picture img) {
+        Picture output = new Picture(img);
+        Pixel[][] grid = output.getPixels2D();
+        for (Pixel[] row : grid) {
+            for (Pixel cell : row) {
+                wipeLowBits(cell);
             }
         }
-        return copyelement;
+        return output;
     }
 
-    public static void setLow(Pixel p, Color c) {
-        int red = (p.getRed() & 0b11111100) | (c.getRed() >> 6);
-        int green = (p.getGreen() & 0b11111100) | (c.getGreen() >> 6);
-        int blue = (p.getBlue() & 0b11111100) | (c.getBlue() >> 6);
-        p.setColor(new Color(red, green, blue));
+    public static void embedLowBits(Pixel px, Color msgColor) {
+        int red = (px.getRed() & 0b11111100) | (msgColor.getRed() >> 6);
+        int green = (px.getGreen() & 0b11111100) | (msgColor.getGreen() >> 6);
+        int blue = (px.getBlue() & 0b11111100) | (msgColor.getBlue() >> 6);
+        px.setColor(new Color(red, green, blue));
     }
 
-
-
-    
-
-    public static PictureMain testSetLow(PictureMain p, Color c) {
-        PictureMain copyelement = new PictureMain(p);
-        Pixel[][] pixels = copyelement.getPixels2D();
-        for (Pixel[] row : pixels) {
-            for (Pixel pixel : row) {
-                setLow(pixel, c);
+    public static Picture previewEmbedLowBits(Picture img, Color msgColor) {
+        Picture copy = new Picture(img);
+        Pixel[][] grid = copy.getPixels2D();
+        for (Pixel[] row : grid) {
+            for (Pixel cell : row) {
+                embedLowBits(cell, msgColor);
             }
         }
-        return copyelement;
+        return copy;
     }
 
-    public static PictureMain revealPictureMain(PictureMain hidden) {
-        PictureMain copyelement = new PictureMain(hidden);
-        Pixel[][] pixels = copyelement.getPixels2D();
-        Pixel[][] source = hidden.getPixels2D();
-        for (int r = 0; r < pixels.length; r++) {
-            for (int c = 0; c < pixels[0].length; c++) {
-                Color col = source[r][c].getColor();
-                pixels[r][c].setColor(new Color(((pixels[r][c].getRed() & 0b00000011) << 6),
-                        ((pixels[r][c].getGreen() & 0b00000011) << 6), ((pixels[r][c].getBlue() & 0b00000011) << 6)));
+    public static Picture revealHiddenImage(Picture codedImage) {
+        Picture revealed = new Picture(codedImage);
+        Pixel[][] result = revealed.getPixels2D();
+        Pixel[][] original = codedImage.getPixels2D();
+        for (int r = 0; r < result.length; r++) {
+            for (int c = 0; c < result[0].length; c++) {
+                Color current = original[r][c].getColor();
+                result[r][c].setColor(new Color(
+                        ((result[r][c].getRed() & 0b11) << 6),
+                        ((result[r][c].getGreen() & 0b11) << 6),
+                        ((result[r][c].getBlue() & 0b11) << 6)));
             }
         }
-        return copyelement;
+        return revealed;
     }
 
-    public static boolean canHide(PictureMain source, PictureMain secret) {
-        return source.getWidth() >= secret.getWidth() && source.getHeight() >= secret.getHeight();
+    public static boolean fitsInside(Picture base, Picture hidden) {
+        return base.getWidth() >= hidden.getWidth() && base.getHeight() >= hidden.getHeight();
     }
 
-    public static PictureMain hidePictureMain(PictureMain source, PictureMain secret, int startRow, int startCol) {
-        PictureMain combined = new PictureMain(source);
-        Pixel[][] sourcePixels = combined.getPixels2D();
-        Pixel[][] secretPixels = secret.getPixels2D();
+    public static Picture embedPicture(Picture container, Picture toHide, int offsetY, int offsetX) {
+        Picture combined = new Picture(container);
+        Pixel[][] baseGrid = combined.getPixels2D();
+        Pixel[][] hideGrid = toHide.getPixels2D();
 
-        for (int r = 0; r < secretPixels.length; r++) {
-            for (int c = 0; c < secretPixels[0].length; c++) {
-                int sourceR = startRow + r;
-                int sourceC = startCol + c;
+        for (int y = 0; y < hideGrid.length; y++) {
+            for (int x = 0; x < hideGrid[0].length; x++) {
+                int newY = offsetY + y;
+                int newX = offsetX + x;
 
-                if (sourceR < sourcePixels.length && sourceC < sourcePixels[0].length) {
-                    Color secretColor = secretPixels[r][c].getColor();
-                    int rNew = (sourcePixels[sourceR][sourceC].getRed() & 0b11111100) | (secretColor.getRed() >> 6);
-                    int gNew = (sourcePixels[sourceR][sourceC].getGreen() & 0b11111100) | (secretColor.getGreen() >> 6);
-                    int bNew = (sourcePixels[sourceR][sourceC].getBlue() & 0b11111100) | (secretColor.getBlue() >> 6);
-
-                    sourcePixels[sourceR][sourceC].setColor(new Color(rNew, gNew, bNew));
+                if (newY < baseGrid.length && newX < baseGrid[0].length) {
+                    Color hideColor = hideGrid[y][x].getColor();
+                    int newRed = (baseGrid[newY][newX].getRed() & 0b11111100) | (hideColor.getRed() >> 6);
+                    int newGreen = (baseGrid[newY][newX].getGreen() & 0b11111100) | (hideColor.getGreen() >> 6);
+                    int newBlue = (baseGrid[newY][newX].getBlue() & 0b11111100) | (hideColor.getBlue() >> 6);
+                    baseGrid[newY][newX].setColor(new Color(newRed, newGreen, newBlue));
                 }
             }
         }
+
         return combined;
     }
 
-    public static boolean isSame(PictureMain pic1, PictureMain pic2) {
-        if (pic1.getWidth() != pic2.getWidth() || pic1.getHeight() != pic2.getHeight()) {
+    public static boolean areEqual(Picture img1, Picture img2) {
+        if (img1.getWidth() != img2.getWidth() || img1.getHeight() != img2.getHeight()) {
             return false;
         }
-        Pixel[][] p1 = pic1.getPixels2D();
-        Pixel[][] p2 = pic2.getPixels2D();
-        for (int r = 0; r < p1.length; r++) {
-            for (int c = 0; c < p1[0].length; c++) {
-                if (!p1[r][c].getColor().equals(p2[r][c].getColor())) {
+
+        Pixel[][] pixelsA = img1.getPixels2D();
+        Pixel[][] pixelsB = img2.getPixels2D();
+
+        for (int y = 0; y < pixelsA.length; y++) {
+            for (int x = 0; x < pixelsA[0].length; x++) {
+                if (!pixelsA[y][x].getColor().equals(pixelsB[y][x].getColor())) {
                     return false;
                 }
             }
         }
+
         return true;
     }
 
-    public static ArrayList<Point> findDifferences(PictureMain pic1, PictureMain pic2) {
-        ArrayList<Point> diffPoints = new ArrayList<>();
-        if (pic1.getWidth() != pic2.getWidth() || pic1.getHeight() != pic2.getHeight()) {
-            return diffPoints;
+    public static ArrayList<Point> locateChanges(Picture original, Picture modified) {
+        ArrayList<Point> diffs = new ArrayList<>();
+        if (original.getWidth() != modified.getWidth() || original.getHeight() != modified.getHeight()) {
+            return diffs;
         }
-        Pixel[][] p1 = pic1.getPixels2D();
-        Pixel[][] p2 = pic2.getPixels2D();
-        for (int r = 0; r < p1.length; r++) {
-            for (int c = 0; c < p1[0].length; c++) {
-                if (!p1[r][c].getColor().equals(p2[r][c].getColor())) {
-                    diffPoints.add(new Point(c, r));
+
+        Pixel[][] base = original.getPixels2D();
+        Pixel[][] compare = modified.getPixels2D();
+
+        for (int y = 0; y < base.length; y++) {
+            for (int x = 0; x < base[0].length; x++) {
+                if (!base[y][x].getColor().equals(compare[y][x].getColor())) {
+                    diffs.add(new Point(x, y));
                 }
             }
         }
-        return diffPoints;
+
+        return diffs;
     }
 
-    public static PictureMain showDifferentArea(PictureMain pic, ArrayList<Point> differences) {
-        PictureMain highlighted = new PictureMain(pic);
-        if (differences.isEmpty()) {
-            return highlighted;
+    public static Picture highlightDiffs(Picture img, ArrayList<Point> changes) {
+        Picture outlined = new Picture(img);
+        if (changes.isEmpty()) {
+            return outlined;
         }
 
-        int minRow = Integer.MAX_VALUE, maxRow = Integer.MIN_VALUE;
-        int minCol = Integer.MAX_VALUE, maxCol = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
 
-        for (Point p : differences) {
-            int row = p.y;
-            int col = p.x;
-            minRow = Math.min(minRow, row);
-            maxRow = Math.max(maxRow, row);
-            minCol = Math.min(minCol, col);
-            maxCol = Math.max(maxCol, col);
+        for (Point pt : changes) {
+            int y = pt.y;
+            int x = pt.x;
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
         }
 
-        Graphics2D g = highlighted.createGraphics();
-        g.setColor(Color.BLUE);
-        g.drawRect(minCol, minRow, maxCol - minCol, maxRow - minRow);
+        Graphics2D g = outlined.createGraphics();
+        g.setColor(Color.RED);
+        g.drawRect(minX, minY, maxX - minX, maxY - minY);
         g.dispose();
 
-        return highlighted;
+        return outlined;
     }
 
-    public static ArrayList<Integer> encodeString(String s) {
-        s = s.toUpperCase();
-        String alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        ArrayList<Integer> result = new ArrayList<Integer>();
-        for (int i = 0; i < s.length(); i++) {
-            if (s.substring(i, i + 1).equals(" ")) {
-                result.add(27);
+    public static ArrayList<Integer> textToCode(String msg) {
+        msg = msg.toUpperCase();
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        ArrayList<Integer> encoding = new ArrayList<>();
+        for (int i = 0; i < msg.length(); i++) {
+            if (msg.charAt(i) == ' ') {
+                encoding.add(27);
             } else {
-                result.add(alpha.indexOf(s.substring(i, i + 1)) + 1);
+                encoding.add(alphabet.indexOf(msg.charAt(i)) + 1);
             }
         }
-        result.add(0);
-        return result;
+        encoding.add(0); // end marker
+        return encoding;
     }
 
-    public static String decodeString(ArrayList<Integer> codes) {
+    public static String codeToText(ArrayList<Integer> data) {
         String result = "";
         String alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (int i = 0; i < codes.size(); i++) {
-            if (codes.get(i) == 27) {
-                result = result + " ";
+        for (int i = 0; i < data.size(); i++) {
+            if (data.get(i) == 27) {
+                result += " ";
             } else {
-                result = result
-                        + alpha.substring(codes.get(i) - 1, codes.get(i));
+                result += alpha.substring(data.get(i) - 1, data.get(i));
             }
         }
         return result;
     }
 
-    private static int[] getBitPairs(int num) {
-        int[] bits = new int[3];
-        int code = num;
+    private static int[] extractTripletBits(int value) {
+        int[] out = new int[3];
+        int temp = value;
         for (int i = 0; i < 3; i++) {
-            bits[i] = code % 4;
-            code = code / 4;
+            out[i] = temp % 4;
+            temp = temp / 4;
         }
-        return bits;
+        return out;
     }
 
-    public static void hideText(PictureMain source, String s) {
-        ArrayList<Integer> encoded = encodeString(s);
-        Pixel[][] pixels = source.getPixels2D();
-        int i = 0;
-        for (int r = 0; r < pixels.length && i < encoded.size(); r++) {
-            for (int c = 0; c < pixels[0].length && i < encoded.size(); c++) {
-                int num = encoded.get(i);
-                int[] bitPairs = getBitPairs(num);
-                Pixel p = pixels[r][c];
-                int red = (p.getRed() & 0b11111100) | bitPairs[0];
-                int green = (p.getGreen() & 0b11111100) | bitPairs[1];
-                int blue = (p.getBlue() & 0b11111100) | bitPairs[2];
-                p.setColor(new Color(red, green, blue));
-                i++;
+    public static void embedText(Picture baseImage, String message) {
+        ArrayList<Integer> encoded = textToCode(message);
+        Pixel[][] pixels = baseImage.getPixels2D();
+        int idx = 0;
+
+        for (int y = 0; y < pixels.length && idx < encoded.size(); y++) {
+            for (int x = 0; x < pixels[0].length && idx < encoded.size(); x++) {
+                int value = encoded.get(idx);
+                int[] bits = extractTripletBits(value);
+                Pixel px = pixels[y][x];
+                int red = (px.getRed() & 0b11111100) | bits[0];
+                int green = (px.getGreen() & 0b11111100) | bits[1];
+                int blue = (px.getBlue() & 0b11111100) | bits[2];
+                px.setColor(new Color(red, green, blue));
+                idx++;
             }
         }
     }
 
-    public static String revealText(PictureMain source) {
-        ArrayList<Integer> words = new ArrayList<>();
-        Pixel[][] pixels = source.getPixels2D();
-        for (int r = 0; r < pixels.length; r++) {
-            for (int c = 0; c < pixels[0].length; c++) {
-                Pixel p = pixels[r][c];
-                int red = p.getRed() & 0b00000011;
-                int green = p.getGreen() & 0b00000011;
-                int blue = p.getBlue() & 0b00000011;
-                int letter = (blue << 4) | (green << 2) | red;
-                if (letter == 0) {
-                    return decodeString(words);
+    public static String decodeText(Picture img) {
+        ArrayList<Integer> result = new ArrayList<>();
+        Pixel[][] pixels = img.getPixels2D();
+
+        for (int y = 0; y < pixels.length; y++) {
+            for (int x = 0; x < pixels[0].length; x++) {
+                Pixel px = pixels[y][x];
+                int red = px.getRed() & 0b11;
+                int green = px.getGreen() & 0b11;
+                int blue = px.getBlue() & 0b11;
+                int val = (blue << 4) | (green << 2) | red;
+                if (val == 0) {
+                    return codeToText(result);
                 }
-                words.add(letter);
+                result.add(val);
             }
         }
-        return decodeString(words);
-    }
-
-    //ACTIVITY 5 CODE
-    public static void randomGrey(PictureMain source, int width, int height) {
-        Pixel[][] pixels = source.getPixels2D();
-        int maxRow = pixels.length - width;
-        int maxCol = pixels[0].length - height;
-        if (maxRow < 0 || maxCol < 0) {
-            System.out.println("Region too large for the image!");
-            return;
-        }
-        // Generate random starting position
-        int startRow = (int) (Math.random() * maxRow);
-        int startCol = (int) (Math.random() * maxCol);
-        // Traverse the selected region
-        for (int r = startRow; r < startRow + height; r++) {
-            for (int c = startCol; c < startCol + width; c++) {
-                if (r < pixels.length && c < pixels[0].length) {
-                    Pixel p = pixels[r][c];
-                    int gray = (p.getRed() + p.getGreen() + p.getBlue()) / 3;
-                    p.setColor(new Color(gray, gray, gray));
-                }
-            }
-        }
-    }
-
-    public static void main(String[] args) {
-        //test runs for activity one
-        PictureMain beach = new PictureMain("beach.jpg");
-        PictureMain arch = new PictureMain("arch.jpg");
-        beach.explore();
-        PictureMain copyelement2 = testSetLow(beach, Color.PINK);
-        copyelement2.explore();
-        PictureMain copyelement3 = revealPictureMain(copyelement2);
-        copyelement3.explore();
-
-        //test runs for activity two
-        System.out.println(canHide(beach, arch));
-        if (canHide(beach, arch)) {
-            PictureMain hidden = hidePictureMain(beach, arch, 0, 0);
-            hidden.explore();
-            PictureMain revealed = revealPictureMain(hidden);
-            revealed.explore();
-        }
-        // test runs for activity three
-        PictureMain swan = new PictureMain("swan.jpg");
-        PictureMain swan2 = new PictureMain("swan.jpg");
-        System.out.println("Swan and swan2 are the same: "
-                + isSame(swan, swan2));
-        swan = testClearLow(swan);
-        System.out.println("Swan and swan2 are the same (after clearLow run on swan): "
-                + isSame(swan, swan2));
-        PictureMain arch1 = new PictureMain("arch.jpg");
-        PictureMain arch2 = new PictureMain("arch.jpg");
-        PictureMain koala = new PictureMain("koala.jpg");
-        PictureMain robot1 = new PictureMain("robot.jpg");
-        ArrayList<Point> pointList = findDifferences(arch1, arch2);
-        System.out.println("PointList after comparing two identical PictureMains has a size of " + pointList.size());
-        pointList = findDifferences(arch1, koala);
-        System.out.println("PointList after comparing two different sized PictureMains has a size of " + pointList.size());
-        arch2 = hidePictureMain(arch1, robot1, 65, 102);
-        pointList = findDifferences(arch1, arch2);
-        System.out.println("Pointlist after hiding a PictureMain has a size of " + pointList.size());
-        arch1.show();
-        arch2.show();
-        PictureMain hall = new PictureMain("femaleLionAndHall.jpg");
-        PictureMain robot2 = new PictureMain("robot.jpg");
-        PictureMain flower2 = new PictureMain("flower1.jpg");
-        PictureMain hall2 = hidePictureMain(hall, robot2, 50, 300);
-        PictureMain hall3 = hidePictureMain(hall2, flower2, 115, 275);
-        hall3.explore();
-        if (!isSame(hall, hall3)) {
-            PictureMain hall4 = showDifferentArea(hall, findDifferences(hall, hall3));
-            hall4.show();
-            PictureMain unhiddenHall3 = revealPictureMain(hall3);
-            unhiddenHall3.show();
-        }
-        //test runs for activity four 
-        PictureMain beach1 = new PictureMain("beach.jpg");
-        hideText(beach1, "HELLO WORLD");
-        String revealed = revealText(beach1);
-        System.out.println("Hidden message: " + revealed);
-
-        //activity 5: applying grey filters to random regions, the region size is specified
-        PictureMain motorcyle = new PictureMain("blueMotorcycle.jpg");
-        motorcyle.explore(); //original image
-        randomGrey(motorcyle, 300, 400);
-        motorcyle.explore(); //grey image
-
+        return codeToText(result);
     }
 }
